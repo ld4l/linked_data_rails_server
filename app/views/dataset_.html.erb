@@ -1,0 +1,19 @@
+<h1>Home page for combined dataset</h1>
+
+<p>
+This linked open data dataset was produced by the Linked Data for
+Libraries (<a href="http://ld4l.org">LD4L</a>) project from the catalogs
+of 
+<a href="https://newcatalog.library.cornell.edu/">Cornell</a>, 
+<a href="http://library.harvard.edu/">Harvard</a>, and 
+<a href="https://searchworks.stanford.edu/">Stanford</a>.
+</p>
+
+<p>
+The dataset is a snapshot that will not be kept up-to-date. The
+dataset was built by extracting data from a triplestore containing
+snapshot data from the three institutions according to the 
+<a href="http://bib.ld4l.org/ontology">LD4L ontology</a>.
+</p>
+
+<%= erb :void, :locals => {:graph_hash => graph_hash} %>

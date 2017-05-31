@@ -1,0 +1,15 @@
+<h2>VoID data</h2>
+
+<table>
+  <% for subject in graph_hash.keys -%>
+    <% for property in graph_hash[subject].keys -%>
+      <% for object in graph_hash[subject][property] -%>
+        <tr>
+          <td><%= subject %></td> 
+          <td><%= property %></td> 
+          <td><%= object %></td> 
+        </tr>
+      <% end -%>
+    <% end -%>
+  <% end -%>
+</table>
