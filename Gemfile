@@ -30,3 +30,8 @@ end
 # gems added beyond Rails app default gems
 gem 'dotenv-deployment'
 gem 'dotenv-rails', '2.1.0'
+gem 'mysql2'
+gem 'rdf'
+gem 'rdf-rdfxml'
+gem 'rdf-json'
+gem 'rdf-turtle'

@@ -2,7 +2,11 @@ class DatasetController < ApplicationController
 
   # Return linked data.
 
-  def get
+  def index
+    process_it
+  end
+
+  def standard
     process_it
   end
 
@@ -13,31 +17,47 @@ class DatasetController < ApplicationController
 
   private
 
+  # localname = nil - VoID
+  # localname has value - Standard
+
     def process_it
       begin
         tokens = parse_request
         #  logger.info ">>>>>>>PARSED #{tokens.inspect}"
         case tokens[:request_type]
           when :uri
-            headers 'Vary' => 'Accept'
-            redirect url_to_display(tokens), 303
+            # headers 'Vary' => 'Accept'
+            # redirect url_to_display(tokens), 303
+            redirect_to "/#{url_to_display(tokens)}", status: 303
           when :display_url
-            [200, create_headers(tokens), display(tokens)]
+            @graph = graph(tokens)
+            @graph_hash = @graph.to_hash
+            @institution_name = tokens[:context]
+            respond_to do |format|
+              format.html # index.html.erb
+              format.n3   { render n3: RDF::Writer.for(:turtle).dump(@graph, nil, :prefixes => prefixes) }
+              format.ttl  { render ttl: RDF::Writer.for(:turtle).dump(@graph, nil, :prefixes => prefixes) }
+              format.nt   { render nt: RDF::Writer.for(:ntriples).dump(@graph) }
+              format.rj   { render rj: RDF::JSON::Writer.dump(@graph, nil, :prefixes => prefixes) }
+              format.rdf  { render rdf: RDF::RDFXML::Writer.dump(@graph, nil, :prefixes => prefixes) }
+            end
+            # [200, create_headers(tokens), display(tokens)]
           when :no_such_individual
             # [404, no_such_individual(tokens)]
-            head :not_found, no_such_individual(tokens)
+            head :not_found, { 'warn-text' => no_such_individual(tokens) }
             return
           when :no_such_format
             # [404, no_such_format(tokens)]
-            head :not_found, no_such_format(tokens)
+            head :not_found, { 'warn-text' => no_such_format(tokens) }
             return
           else
             # [404, "BAD REQUEST: #{request.path} ==> #{tokens.inspect}"]
-            head :bad_request, "BAD REQUEST: #{request.path} ==> #{tokens.inspect}"]
-            retur        end
+            head :bad_request, { 'warn-text' => "BAD REQUEST: #{request.path} ==> #{tokens.inspect}" }
+            return
+        end
       rescue
         # [500, internal_server_error(request, $!)]
-        head :internal_server_error, internal_server_error(request, $!)
+        head :internal_server_error, { 'warn-text' => internal_server_error(request, $!) }
         return
       end
     end
@@ -56,6 +76,7 @@ class DatasetController < ApplicationController
       return tokens.merge(request_type: :display_url)
     end
 
+    # Returns format as one of ['n3', 'ttl', 'nt', 'rj', 'html', '']
     def parse_format(path)
       # format appears after the last period.
       remainder, dot, format = path.rpartition('.')
@@ -63,6 +84,7 @@ class DatasetController < ApplicationController
       return [remainder, format]
     end
 
+    # Returns localname of the URI
     def parse_localname(path)
       # localname appears after the second slash
       remainder, slash, localname = path.rpartition('/')
@@ -70,6 +92,7 @@ class DatasetController < ApplicationController
       return [remainder, localname]
     end
 
+    # Returns context as [Cornell, Harvard, Stanford]
     def parse_context(path)
       path.chop! if path[-1] == '/'
       if path =~ %r{^/(.+)$}
@@ -143,7 +166,8 @@ class DatasetController < ApplicationController
     # If request.preferred_type has no preference, it will prefer the first one.
     def preferred_format()
       default_mime = ext_to_mime['ttl']
-      mime = request.preferred_type([default_mime] + mime_to_ext.keys)
+      # mime = request.preferred_type([default_mime] + mime_to_ext.keys)
+      mime = 'text/html'  ### TODO: Remove hardcoded type
       if mime && mime_to_ext.has_key?(mime)
         mime_to_ext[mime]
       else
@@ -174,12 +198,18 @@ class DatasetController < ApplicationController
       end
     end
 
-    def display(tokens)
+    def graph(tokens)
       contents = $files.read(tokens[:uri])
       graph = RDF::Graph.new << RDF::Reader.for(:turtle).new(contents)
       graph << void_triples(tokens)
-      build_the_output(graph, tokens, prefixes)
     end
+
+    # def display(tokens)
+    #   contents = $files.read(tokens[:uri])
+    #   graph = RDF::Graph.new << RDF::Reader.for(:turtle).new(contents)
+    #   graph << void_triples(tokens)
+    #   build_the_output(graph, tokens, prefixes)
+    # end
 
     def void_triples(tokens)
       s = RDF::URI.new(tokens[:uri])
@@ -188,25 +218,25 @@ class DatasetController < ApplicationController
       RDF::Statement(s, p, o)
     end
 
-    def build_the_output(graph, tokens, prefixes)
-      format = tokens[:format]
-      case format
-        when 'n3', 'ttl'
-          RDF::Writer.for(:turtle).dump(graph, nil, :prefixes => prefixes)
-        when 'nt'
-          RDF::Writer.for(:ntriples).dump(graph)
-        when 'rj'
-          RDF::JSON::Writer.dump(graph, nil, :prefixes => prefixes)
-        when 'html'
-          merge_graph_into_template(tokens, graph)
-        else # 'rdf'
-          RDF::RDFXML::Writer.dump(graph, nil, :prefixes => prefixes)
-      end
-    end
+    # def build_the_output(graph, tokens, prefixes)
+    #   format = tokens[:format]
+    #   case format
+    #     when 'n3', 'ttl'
+    #       RDF::Writer.for(:turtle).dump(graph, nil, :prefixes => prefixes)
+    #     when 'nt'
+    #       RDF::Writer.for(:ntriples).dump(graph)
+    #     when 'rj'
+    #       RDF::JSON::Writer.dump(graph, nil, :prefixes => prefixes)
+    #     when 'html'
+    #       merge_graph_into_template(tokens, graph)
+    #     else # 'rdf'
+    #       RDF::RDFXML::Writer.dump(graph, nil, :prefixes => prefixes)
+    #   end
+    # end
 
-    def create_headers(tokens)
-      {"Content-Type" => ext_to_mime[tokens[:format]] + ';charset=utf-8'}
-    end
+    # def create_headers(tokens)
+    #   {"Content-Type" => ext_to_mime[tokens[:format]] + ';charset=utf-8'}
+    # end
 
     def no_such_individual(tokens)
       "No such individual #{tokens.inspect}"
@@ -224,7 +254,8 @@ class DatasetController < ApplicationController
     end
 
     def logit(message)
-      puts "#{Time.new.strftime('%Y-%m-%d %H:%M:%S')} #{message}"
+      logger.warn "#{Time.new.strftime('%Y-%m-%d %H:%M:%S')} #{message}"
+      # puts "#{Time.new.strftime('%Y-%m-%d %H:%M:%S')} #{message}"
     end
 end
 

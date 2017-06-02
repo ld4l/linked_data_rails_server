@@ -5,9 +5,8 @@ require 'rdf/turtle'
 require 'zlib'
 require 'tilt/erubis'
 
-require 'linked_data_server/file_systems'
-require 'linked_data_server/process_arguments'
-require 'linked_data_server/paths'
+require 'linked_data_rails_server/file_systems'
+# require 'linked_data_rails_server/process_arguments'
 
 module Kernel
   def bogus(message)

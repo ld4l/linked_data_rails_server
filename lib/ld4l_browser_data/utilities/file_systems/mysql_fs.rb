@@ -8,7 +8,8 @@ module Ld4lBrowserData
           :host => 'localhost',
           :username => 'SUPPLY_USERNAME',
           :password => 'SUPPLY_PASSWORD',
-          :database => 'ld4l',
+          # :database => 'ld4l',  ### TODO hardcoded database to development
+          :database => 'ld4l_development',
         }
 
         def initialize(params)
