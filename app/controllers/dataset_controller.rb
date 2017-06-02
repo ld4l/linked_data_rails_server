@@ -28,18 +28,20 @@ class DatasetController < ApplicationController
           when :uri
             # headers 'Vary' => 'Accept'
             # redirect url_to_display(tokens), 303
+            # Format was not specified.  Tack one on and redirect.
             redirect_to "/#{url_to_display(tokens)}", status: 303
           when :display_url
             @graph = graph(tokens)
             @graph_hash = @graph.to_hash
+            @prefixes = prefixes
             @institution_name = tokens[:context]
             respond_to do |format|
               format.html # index.html.erb
-              format.n3   { render n3: RDF::Writer.for(:turtle).dump(@graph, nil, :prefixes => prefixes) }
-              format.ttl  { render ttl: RDF::Writer.for(:turtle).dump(@graph, nil, :prefixes => prefixes) }
-              format.nt   { render nt: RDF::Writer.for(:ntriples).dump(@graph) }
-              format.rj   { render rj: RDF::JSON::Writer.dump(@graph, nil, :prefixes => prefixes) }
-              format.rdf  { render rdf: RDF::RDFXML::Writer.dump(@graph, nil, :prefixes => prefixes) }
+              format.n3   { render inline: RDF::Writer.for(:turtle).dump(@graph, nil, :prefixes => prefixes) }
+              format.ttl  { render inline: RDF::Writer.for(:turtle).dump(@graph, nil, :prefixes => prefixes) }
+              format.nt   { render inline: RDF::Writer.for(:ntriples).dump(@graph) }
+              format.rj   { render inline: RDF::JSON::Writer.dump(@graph, nil, :prefixes => prefixes) }
+              format.rdf  { render inline: RDF::RDFXML::Writer.dump(@graph, nil, :prefixes => prefixes) }
             end
             # [200, create_headers(tokens), display(tokens)]
           when :no_such_individual
@@ -163,7 +165,7 @@ class DatasetController < ApplicationController
       end
     end
 
-    # If request.preferred_type has no preference, it will prefer the first one.
+    # Determine mimetype from AcceptHeader when format is not specified
     def preferred_format()
       default_mime = ext_to_mime['ttl']
       # mime = request.preferred_type([default_mime] + mime_to_ext.keys)

@@ -1,1 +1,1 @@
-<pre><%= RDF::Writer.for(:turtle).dump(graph, nil, :prefixes => prefixes).gsub('<', '&lt;').gsub('>', '&gt;') -%></pre>
+<pre><%= RDF::Writer.for(:turtle).dump(@graph, nil, :prefixes => @prefixes).gsub('<', '&lt;').gsub('>', '&gt;') -%></pre>
