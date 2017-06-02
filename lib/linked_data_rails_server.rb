@@ -14,7 +14,7 @@ module Kernel
   end
 end
 
-module LinkedDataServer
+module LinkedDataRailsServer
   # You screwed up the calling sequence.
   class IllegalStateError < StandardError
   end
@@ -22,4 +22,7 @@ module LinkedDataServer
   # What did you ask for?
   class UserInputError < StandardError
   end
+
+  # Raised when the requested file supporting the response does not exist
+  class UnknownIndividual < StandardError; end
 end

@@ -22,34 +22,25 @@ class DatasetController < ApplicationController
     def process_it
       begin
         tokens = parse_request
-        #  logger.info ">>>>>>>PARSED #{tokens.inspect}"
-        case tokens[:request_type]
-          when :uri
-            # Format was not specified.  Tack one on and redirect.
-            redirect_to "/#{url_to_display(tokens)}", status: 303
-          when :display_url
-            @graph = graph(tokens)
-            @graph_hash = @graph.to_hash
-            @prefixes = prefixes
-            @institution_name = tokens[:context]
-            respond_to do |format|
-              format.html # index.html.erb or standard.html.erb based on route
-              format.n3   { render inline: RDF::Writer.for(:turtle).dump(@graph, nil, :prefixes => prefixes) }
-              format.ttl  { render inline: RDF::Writer.for(:turtle).dump(@graph, nil, :prefixes => prefixes) }
-              format.nt   { render inline: RDF::Writer.for(:ntriples).dump(@graph) }
-              format.rj   { render inline: RDF::JSON::Writer.dump(@graph, nil, :prefixes => prefixes) }
-              format.rdf  { render inline: RDF::RDFXML::Writer.dump(@graph, nil, :prefixes => prefixes) }
-            end
-          when :no_such_individual
-            head :not_found, { 'warn-text' => no_such_individual(tokens) }
-            return
-          when :no_such_format
-            head :not_found, { 'warn-text' => no_such_format(tokens) }
-            return
-          else
-            head :bad_request, { 'warn-text' => "BAD REQUEST: #{request.path} ==> #{tokens.inspect}" }
-            return
+        logger.info ">>>>>>>PARSED #{tokens.inspect} + request.format=>''#{request.format}''"
+        @graph = graph(tokens)
+        @graph_hash = @graph.to_hash
+        @prefixes = prefixes
+        @institution_name = tokens[:context]
+        respond_to do |format|
+          format.html # index.html.erb or standard.html.erb based on route
+          format.n3   { render inline: RDF::Writer.for(:turtle).dump(@graph, nil, :prefixes => @prefixes) }
+          format.ttl  { render inline: RDF::Writer.for(:turtle).dump(@graph, nil, :prefixes => @prefixes) }
+          format.nt   { render inline: RDF::Writer.for(:ntriples).dump(@graph) }
+          format.rj   { render inline: RDF::JSON::Writer.dump(@graph, nil, :prefixes => @prefixes) }
+          format.rdf  { render inline: RDF::RDFXML::Writer.dump(@graph, nil, :prefixes => @prefixes) }
         end
+      rescue LinkedDataRailsServer::UnknownIndividual => e
+        head :not_found, { 'warn-text' => e.message }
+        return
+      rescue ActionController::UnknownFormat
+        head :not_found, { 'warn-text' => no_such_format }
+        return
       rescue
         head :internal_server_error, { 'warn-text' => internal_server_error(request, $!) }
         return
@@ -62,12 +53,10 @@ class DatasetController < ApplicationController
       path, localname = parse_localname(path)
       context = parse_context(path)
       uri = assemble_uri(context, localname)
-      tokens = {context: context, localname: localname, format: format, uri: uri}
+      tokens = {context: context, localname: localname, uri: uri}
 
-      return tokens.merge(request_type: :no_such_individual) unless known_individual(tokens)
-      return tokens.merge(request_type: :uri, format: preferred_format) if format.empty?
-      return tokens.merge(request_type: :no_such_format) unless recognized_format(format)
-      return tokens.merge(request_type: :display_url)
+      raise LinkedDataRailsServer::UnknownIndividual, no_such_individual(tokens) unless known_individual(tokens)
+      tokens
     end
 
     # Returns format as one of ['n3', 'ttl', 'nt', 'rj', 'html', '']
@@ -106,21 +95,6 @@ class DatasetController < ApplicationController
       end
     end
 
-    def ext_to_mime
-      {
-          'html' => 'text/html',
-          'n3' => 'text/n3',
-          'nt' => 'application/n-triples',
-          'rdf' => 'application/rdf+xml',
-          'rj' => 'application/rdf+json',
-          'ttl' => 'text/turtle'
-      }
-    end
-
-    def mime_to_ext
-      ext_to_mime.invert
-    end
-
     def prefixes
       {
           ''.to_sym => RDF::URI('http://draft.ld4l.org/') ,
@@ -144,46 +118,12 @@ class DatasetController < ApplicationController
       }
     end
 
-    def choose_template(tokens)
-      if tokens[:localname].empty?
-        "dataset_#{tokens[:context]}"
-      else
-        "standard"
-      end
-    end
-
-    # Determine mimetype from AcceptHeader when format is not specified
-    def preferred_format()
-      default_mime = ext_to_mime['ttl']
-      # mime = request.preferred_type([default_mime] + mime_to_ext.keys)
-      mime = 'text/html'  ### TODO: Remove hardcoded type
-      if mime && mime_to_ext.has_key?(mime)
-        mime_to_ext[mime]
-      else
-        default_ext
-      end
-    end
-
     def known_individual(tokens)
       uri = tokens[:uri]
       if $files.acceptable?(uri)
         $files.exist?(uri)
       else
         false
-      end
-    end
-
-    def recognized_format(format)
-      ext_to_mime.has_key?(format)
-    end
-
-    def url_to_display(tokens)
-      if tokens[:context].empty?
-        "%s.%s" % tokens.values_at(:localname, :format)
-      elsif tokens[:localname].empty?
-        "%s.%s" % tokens.values_at(:context, :format)
-      else
-        "%s/%s.%s" % tokens.values_at(:context, :localname, :format)
       end
     end
 
@@ -204,8 +144,8 @@ class DatasetController < ApplicationController
       "No such individual #{tokens.inspect}"
     end
 
-    def no_such_format(tokens)
-      "No such format #{tokens[:format]}"
+    def no_such_format
+      "No such format '#{request.format.to_s}'.  Supported formats: '*.html':'text/html', '*.n3':'text/n3', '*.nt':'application/n-triples', '*.rdf':'application/rdf+xml', '*.rj':'application/rdf+json', '*.ttl':'text/turtle'."
     end
 
     def internal_server_error(request, ex)
