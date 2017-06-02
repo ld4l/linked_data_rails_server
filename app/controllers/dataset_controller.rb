@@ -3,10 +3,12 @@ class DatasetController < ApplicationController
   # Return linked data.
 
   def index
+    # Process requests for all triples or all triples for a specific organization.
     process_it
   end
 
   def standard
+    # Process a single URI request.
     process_it
   end
 
@@ -17,17 +19,12 @@ class DatasetController < ApplicationController
 
   private
 
-  # localname = nil - VoID
-  # localname has value - Standard
-
     def process_it
       begin
         tokens = parse_request
         #  logger.info ">>>>>>>PARSED #{tokens.inspect}"
         case tokens[:request_type]
           when :uri
-            # headers 'Vary' => 'Accept'
-            # redirect url_to_display(tokens), 303
             # Format was not specified.  Tack one on and redirect.
             redirect_to "/#{url_to_display(tokens)}", status: 303
           when :display_url
@@ -36,29 +33,24 @@ class DatasetController < ApplicationController
             @prefixes = prefixes
             @institution_name = tokens[:context]
             respond_to do |format|
-              format.html # index.html.erb
+              format.html # index.html.erb or standard.html.erb based on route
               format.n3   { render inline: RDF::Writer.for(:turtle).dump(@graph, nil, :prefixes => prefixes) }
               format.ttl  { render inline: RDF::Writer.for(:turtle).dump(@graph, nil, :prefixes => prefixes) }
               format.nt   { render inline: RDF::Writer.for(:ntriples).dump(@graph) }
               format.rj   { render inline: RDF::JSON::Writer.dump(@graph, nil, :prefixes => prefixes) }
               format.rdf  { render inline: RDF::RDFXML::Writer.dump(@graph, nil, :prefixes => prefixes) }
             end
-            # [200, create_headers(tokens), display(tokens)]
           when :no_such_individual
-            # [404, no_such_individual(tokens)]
             head :not_found, { 'warn-text' => no_such_individual(tokens) }
             return
           when :no_such_format
-            # [404, no_such_format(tokens)]
             head :not_found, { 'warn-text' => no_such_format(tokens) }
             return
           else
-            # [404, "BAD REQUEST: #{request.path} ==> #{tokens.inspect}"]
             head :bad_request, { 'warn-text' => "BAD REQUEST: #{request.path} ==> #{tokens.inspect}" }
             return
         end
       rescue
-        # [500, internal_server_error(request, $!)]
         head :internal_server_error, { 'warn-text' => internal_server_error(request, $!) }
         return
       end
@@ -94,7 +86,7 @@ class DatasetController < ApplicationController
       return [remainder, localname]
     end
 
-    # Returns context as [Cornell, Harvard, Stanford]
+    # Returns context as [cornell, harvard, stanford]
     def parse_context(path)
       path.chop! if path[-1] == '/'
       if path =~ %r{^/(.+)$}
@@ -152,11 +144,6 @@ class DatasetController < ApplicationController
       }
     end
 
-    def merge_graph_into_template(tokens, graph)
-      template = choose_template(tokens)
-      erb template.to_sym, :locals => {:graph => graph, :graph_hash => graph.to_hash, :prefixes => prefixes}
-    end
-
     def choose_template(tokens)
       if tokens[:localname].empty?
         "dataset_#{tokens[:context]}"
@@ -206,39 +193,12 @@ class DatasetController < ApplicationController
       graph << void_triples(tokens)
     end
 
-    # def display(tokens)
-    #   contents = $files.read(tokens[:uri])
-    #   graph = RDF::Graph.new << RDF::Reader.for(:turtle).new(contents)
-    #   graph << void_triples(tokens)
-    #   build_the_output(graph, tokens, prefixes)
-    # end
-
     def void_triples(tokens)
       s = RDF::URI.new(tokens[:uri])
       p = RDF::URI.new("http://rdfs.org/ns/void#inDataset")
       o = RDF::URI.new('http://draft.ld4l.org/' + tokens[:context])
       RDF::Statement(s, p, o)
     end
-
-    # def build_the_output(graph, tokens, prefixes)
-    #   format = tokens[:format]
-    #   case format
-    #     when 'n3', 'ttl'
-    #       RDF::Writer.for(:turtle).dump(graph, nil, :prefixes => prefixes)
-    #     when 'nt'
-    #       RDF::Writer.for(:ntriples).dump(graph)
-    #     when 'rj'
-    #       RDF::JSON::Writer.dump(graph, nil, :prefixes => prefixes)
-    #     when 'html'
-    #       merge_graph_into_template(tokens, graph)
-    #     else # 'rdf'
-    #       RDF::RDFXML::Writer.dump(graph, nil, :prefixes => prefixes)
-    #   end
-    # end
-
-    # def create_headers(tokens)
-    #   {"Content-Type" => ext_to_mime[tokens[:format]] + ';charset=utf-8'}
-    # end
 
     def no_such_individual(tokens)
       "No such individual #{tokens.inspect}"
@@ -257,25 +217,6 @@ class DatasetController < ApplicationController
 
     def logit(message)
       logger.warn "#{Time.new.strftime('%Y-%m-%d %H:%M:%S')} #{message}"
-      # puts "#{Time.new.strftime('%Y-%m-%d %H:%M:%S')} #{message}"
     end
 end
 
-
-
-# # Serve the home page.
-# get '/' do
-#   process_it
-# end
-#
-# # In the downloads directory and sub-directories, use "index.html" as the default page.
-# get '/downloads*/' do |dirs|
-#   redirect "/downloads#{dirs}/index.html"
-# end
-#
-# # Serve any request that doesn't start with a '_' or a 'd', so special pages
-# # (like __sinatra__500.png) will pass through, and so will /downloads.
-# get /^\/[^_d]/ do
-#   process_it
-# end
-#

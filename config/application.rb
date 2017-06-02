@@ -17,7 +17,11 @@ module LinkedDataRailsServer
 
     require 'linked_data_rails_server'
 
-    $files = ::Ld4lBrowserData::Utilities::FileSystems::MySqlZipFS.new(:username => 'ld4luser', :password => 'ld4lpass')
-
+    db_config = Rails.configuration.database_configuration
+    host      = db_config[Rails.env]["host"]
+    database  = db_config[Rails.env]["database"]
+    username  = db_config[Rails.env]["username"]
+    password  = db_config[Rails.env]["password"]
+    $files = ::Ld4lBrowserData::Utilities::FileSystems::MySqlZipFS.new(host: host, username: username, password: password, database: database)
   end
 end

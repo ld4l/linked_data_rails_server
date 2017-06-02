@@ -17,7 +17,7 @@
     <a href="http://bib.ld4l.org/ontology">LD4L ontology</a>.
   </p>
 <% else %>
-  <h1>Home page for <%= @institution_name %> dataset</h1>
+  <h1>Home page for <%= @institution_name.capitalize %> dataset</h1>
 <% end %>
 
 <%= render partial: 'void', :locals => {:graph_hash => @graph_hash} %>
